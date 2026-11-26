@@ -32,7 +32,7 @@ flowchart LR
 ### 2. Install
 
 ```bash
-git clone https://github.com/<your-username>/audio-to-note.git
+git clone https://github.com/StephM10/audio-to-note.git
 cd audio-to-note
 
 python -m venv .venv
