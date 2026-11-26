@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audio-to-note"
+version = "0.1.0"
+description = "Modular audio/video transcription, speaker diarization, and AI note-taking via CLI & Web GUI"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "audio-to-note contributors" }]
+keywords = ["asr", "transcription", "diarization", "llm", "meeting-notes", "vibevoice", "whisper", "fastapi"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "click>=8.1",
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "python-multipart>=0.0.9",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+whisper = ["faster-whisper>=1.0"]
+diarize-onnx = ["sherpa-onnx>=1.10", "numpy>=1.26"]
+diarize-pyannote = ["pyannote.audio>=3.3", "torch>=2.2"]
+dev = ["pytest>=8.2", "ruff>=0.6", "build>=1.2"]
+
+[project.scripts]
+audio-to-note = "audio_to_note.cli:main"
+a2n = "audio_to_note.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+audio_to_note = ["web/static/*", "prompts/*.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

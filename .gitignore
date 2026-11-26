@@ -1,0 +1,36 @@
+# Python & packaging
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Local tools, runtimes, and downloaded model weights (never commit)
+.tools/
+vendor/
+models/
+outputs/
+uploads/
+*.gguf
+*.onnx
+*.bin
+*.pt
+*.pth
+*.safetensors
+*.prefix
+*.part*
+*.log
+
+# Local secrets and personal configuration
+.env
+.env.*
+!.env.example
+config/config.yaml
+config/*.local.*
+config/hotwords.txt
+config/vibevoice_*.json

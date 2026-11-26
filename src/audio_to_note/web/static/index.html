@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>audio-to-note — Audio Transcription &amp; AI Notes</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">🎙️</div>
+        <div>
+          <div class="brand-title">audio-to-note</div>
+          <div class="brand-sub" id="app-version">v0.1.0</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary full-width" id="btn-new-job">+ New Job</button>
+
+      <div class="sidebar-section">
+        <div class="section-label">History</div>
+        <div id="job-list" class="job-list">
+          <div class="empty-hint">No jobs yet</div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-ghost full-width" id="btn-env">🩺 Environment Check</button>
+        <button class="btn btn-ghost full-width" id="btn-settings">⚙️ Settings &amp; APIs</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      <!-- New Job View -->
+      <section id="view-new-job" class="view">
+        <header class="view-header">
+          <div>
+            <h1>New Audio-to-Note Pipeline</h1>
+            <p class="muted">Audio/Video &rarr; ASR + Hotwords &rarr; Speaker Diarization &rarr; Optional Polish &rarr; AI Summary</p>
+          </div>
+          <div id="quick-badges" class="quick-badges"></div>
+        </header>
+
+        <!-- Input Dropzone -->
+        <div class="card">
+          <div class="card-header">
+            <span class="step-pill">Input</span>
+            <h2>Audio or Video Recording</h2>
+          </div>
+          <div id="dropzone" class="dropzone">
+            <input type="file" id="file-input" accept="audio/*,video/*" hidden />
+            <div class="dropzone-body">
+              <div class="dropzone-icon">📁</div>
+              <div id="selected-file-label" class="dropzone-text">
+                Drag &amp; drop audio/video here, or <button type="button" class="link-btn" id="btn-pick-upload">choose file</button>
+              </div>
+              <div class="or-divider">or select a local path directly (no upload copy needed for large files)</div>
+              <div class="inline-row">
+                <input type="text" id="local-path-input" placeholder="/path/to/meeting.mp4" />
+                <button type="button" class="btn btn-secondary" id="btn-browse-audio">Browse Server</button>
+              </div>
+            </div>
+          </div>
+          <div class="field-row mt-12">
+            <label>Job Title (optional)
+              <input type="text" id="job-title-input" placeholder="Auto-filled from filename" />
+            </label>
+          </div>
+        </div>
+
+        <!-- Modular Pipeline Grid -->
+        <div class="pipeline-grid">
+          <!-- Block 1: ASR -->
+          <div class="card">
+            <div class="card-header">
+              <span class="step-pill">Stage 2</span>
+              <h2>1. Speech Recognition (ASR)</h2>
+              <span id="asr-status-badge" class="status-badge">checking...</span>
+            </div>
+            <div class="field-col">
+              <label>ASR Provider
+                <select id="asr-provider"></select>
+              </label>
+              <div id="asr-hint" class="hint-box hidden"></div>
+              <div class="two-col">
+                <label>Language
+                  <select id="asr-language">
+                    <option value="auto">Auto Detect</option>
+                    <option value="en">English (en)</option>
+                    <option value="zh">Chinese (zh)</option>
+                    <option value="ja">Japanese (ja)</option>
+                    <option value="ko">Korean (ko)</option>
+                    <option value="de">German (de)</option>
+                    <option value="fr">French (fr)</option>
+                    <option value="es">Spanish (es)</option>
+                  </select>
+                </label>
+                <label>Model Override (optional)
+                  <input type="text" id="asr-model-override" placeholder="Uses config default" list="asr-detected-models" />
+                  <datalist id="asr-detected-models"></datalist>
+                </label>
+              </div>
+
+              <details class="collapsible" open>
+                <summary>Editable Hotwords &amp; Glossary <span class="muted">(lines starting with # ignored; supports <code>wrong -&gt; right</code>)</span></summary>
+                <textarea id="hotwords-editor" rows="5" placeholder="VibeVoice&#10;cohesin&#10;wrong term -> right term"></textarea>
+                <div class="row-end">
+                  <span id="hotwords-save-msg" class="muted small"></span>
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-save-hotwords">Save Hotwords</button>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <!-- Block 2: Diarization -->
+          <div class="card">
+            <div class="card-header">
+              <span class="step-pill">Stage 3</span>
+              <h2>2. Speaker Diarization</h2>
+              <span id="diar-status-badge" class="status-badge">checking...</span>
+            </div>
+            <div class="field-col">
+              <label>Diarizer Engine
+                <select id="diar-provider"></select>
+              </label>
+              <div id="diar-hint" class="hint-box hidden"></div>
+              <label>Speaker Count Hint (optional, leave blank for auto)
+                <input type="number" id="num-speakers" min="1" max="20" placeholder="Auto" />
+              </label>
+              <p class="muted small">
+                Tip: VibeVoice already outputs speaker turns, while <strong>sherpa-onnx</strong> (no token needed) or <strong>pyannote</strong> uses dedicated voice embeddings for cleaner speaker separation.
+              </p>
+            </div>
+          </div>
+
+          <!-- Block 3 & 4: Polish + LLM Summarization -->
+          <div class="card span-2">
+            <div class="card-header">
+              <span class="step-pill">Stages 4 &amp; 5</span>
+              <h2>3. Polish &amp; AI Summarization</h2>
+              <span id="llm-status-badge" class="status-badge">checking...</span>
+            </div>
+
+            <div class="toggles-row">
+              <label class="switch-label">
+                <input type="checkbox" id="toggle-polish" />
+                <span><strong>Polish Transcript</strong> (clean filler words, punctuation &amp; apply hotword corrections before summarizing)</span>
+              </label>
+              <label class="switch-label">
+                <input type="checkbox" id="toggle-summarize" checked />
+                <span><strong>Generate AI Notes</strong> (Stage 5)</span>
+              </label>
+            </div>
+
+            <div id="llm-config-section" class="field-col mt-12">
+              <div class="three-col">
+                <label>LLM Provider
+                  <select id="llm-provider">
+                    <option value="openai_compat">OpenAI-Compatible API (vLLM / Ollama / Cloud)</option>
+                    <option value="llama_cli">llama-cli (Local GGUF)</option>
+                  </select>
+                </label>
+                <label>Quick Preset
+                  <select id="llm-preset">
+                    <option value="custom">Custom</option>
+                  </select>
+                </label>
+                <label>Output Language
+                  <select id="output-language">
+                    <option value="auto">Match Transcript</option>
+                    <option value="Chinese">Chinese (中文)</option>
+                    <option value="English">English</option>
+                    <option value="Bilingual (English terms + Chinese summary)">Bilingual (中文总结 + 英文术语)</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="three-col">
+                <label>Base URL
+                  <input type="text" id="llm-base-url" placeholder="http://127.0.0.1:11434/v1" />
+                </label>
+                <label>API Key (leave blank/masked if saved)
+                  <input type="password" id="llm-api-key" placeholder="sk-... or ollama" />
+                </label>
+                <label>Model Name
+                  <div class="inline-row">
+                    <input type="text" id="llm-model" list="llm-models-datalist" placeholder="qwen2.5:7b" />
+                    <datalist id="llm-models-datalist"></datalist>
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-fetch-models">Fetch</button>
+                  </div>
+                </label>
+              </div>
+
+              <div class="two-col">
+                <label>Prompt Template
+                  <select id="prompt-select"></select>
+                </label>
+                <div class="row-end align-bottom">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-test-llm">Test LLM Connection</button>
+                  <span id="llm-test-msg" class="muted small"></span>
+                </div>
+              </div>
+
+              <details class="collapsible">
+                <summary>View / Edit Active Prompt Template</summary>
+                <div class="field-col mt-8">
+                  <label>System Prompt
+                    <textarea id="prompt-system-editor" rows="4"></textarea>
+                  </label>
+                  <label>User Prompt Template <span class="muted">(placeholders: <code>{transcript}</code>, <code>{hotwords}</code>, <code>{title}</code>)</span>
+                    <textarea id="prompt-user-editor" rows="6"></textarea>
+                  </label>
+                  <div class="row-end">
+                    <input type="text" id="prompt-save-name" placeholder="Save as new template name (optional)" style="max-width:260px" />
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-save-prompt">Save Prompt</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn btn-secondary" id="btn-transcribe-only">Transcribe Only (Stages 1-3)</button>
+          <button class="btn btn-primary btn-lg" id="btn-start-pipeline">▶ Start Full Pipeline</button>
+        </div>
+      </section>
+
+      <!-- Job Detail / Progress View -->
+      <section id="view-job-detail" class="view hidden">
+        <header class="view-header">
+          <div>
+            <div class="inline-row">
+              <h1 id="job-detail-title">Job</h1>
+              <span id="job-detail-status" class="status-badge">running</span>
+            </div>
+            <p id="job-detail-meta" class="muted small"></p>
+          </div>
+          <div class="inline-row">
+            <button class="btn btn-secondary btn-sm" id="btn-delete-job">Delete</button>
+          </div>
+        </header>
+
+        <!-- Progress Card -->
+        <div id="progress-card" class="card">
+          <div class="progress-header">
+            <span id="progress-stage-label">Initializing...</span>
+            <span id="progress-pct">0%</span>
+          </div>
+          <div class="progress-track">
+            <div id="progress-bar" class="progress-fill" style="width: 0%"></div>
+          </div>
+          <div id="job-error-box" class="error-box hidden"></div>
+        </div>
+
+        <!-- Split Workspace: Transcript | Summary -->
+        <div class="split-workspace">
+          <!-- Left: Transcript + Speaker Rename & Inline Editor -->
+          <div class="card pane">
+            <div class="card-header">
+              <h2>Transcript</h2>
+              <div class="inline-row">
+                <select id="transcript-view-mode" class="select-sm">
+                  <option value="raw">Raw ASR</option>
+                  <option value="polished">Polished</option>
+                </select>
+                <select id="transcript-edit-mode" class="select-sm">
+                  <option value="segments">Edit Segments</option>
+                  <option value="markdown">Edit Markdown</option>
+                  <option value="preview">Read-only</option>
+                </select>
+                <button class="btn btn-primary btn-sm hidden" id="btn-save-transcript">Save Edits</button>
+                <span id="transcript-save-msg" class="muted small"></span>
+                <button class="btn btn-secondary btn-sm" id="btn-copy-transcript">Copy</button>
+                <a class="btn btn-secondary btn-sm" id="link-dl-transcript" download>Download .md</a>
+              </div>
+            </div>
+            <div id="speaker-rename-bar" class="speaker-bar hidden"></div>
+            <datalist id="job-speakers-datalist"></datalist>
+            <div id="transcript-segments-editor" class="segments-editor hidden"></div>
+            <textarea id="transcript-md-editor" class="doc-textarea hidden"></textarea>
+            <pre id="transcript-output" class="doc-pre">Waiting for transcript...</pre>
+          </div>
+
+          <!-- Right: Summary + Re-summarize -->
+          <div class="card pane">
+            <div class="card-header">
+              <h2>AI Summary Notes</h2>
+              <div class="inline-row">
+                <button class="btn btn-secondary btn-sm" id="btn-copy-summary">Copy</button>
+                <a class="btn btn-secondary btn-sm" id="link-dl-summary" download>Download .md</a>
+              </div>
+            </div>
+            <div class="resummarize-bar">
+              <select id="resum-prompt"></select>
+              <input type="text" id="resum-model" placeholder="Model (keep default)" />
+              <label class="inline-check"><input type="checkbox" id="resum-polish" /> Polish</label>
+              <button class="btn btn-primary btn-sm" id="btn-resummarize">Re-summarize</button>
+            </div>
+            <div id="summary-output" class="markdown-body">
+              <p class="muted">Summary will appear here...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="modal-settings" class="modal hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>Settings (saved to local config/config.yaml)</h2>
+        <button class="btn-icon" data-close="modal-settings">✕</button>
+      </div>
+      <div class="modal-body field-col">
+        <h3>Local ASR Paths &amp; Runtimes</h3>
+        <label>CrispASR Binary Path <input type="text" id="set-crisp-bin" /></label>
+        <label>CrispASR GGUF Model <input type="text" id="set-crisp-model" /></label>
+        <label>OpenAI-Compat ASR Base URL <input type="text" id="set-oasr-url" /></label>
+        <label>OpenAI-Compat ASR API Key <input type="password" id="set-oasr-key" /></label>
+
+        <h3>Diarization Models</h3>
+        <label>sherpa-onnx Segmentation .onnx <input type="text" id="set-sh-seg" /></label>
+        <label>sherpa-onnx Embedding .onnx <input type="text" id="set-sh-emb" /></label>
+        <label>pyannote HF_TOKEN <input type="password" id="set-hf-token" /></label>
+
+        <h3>Default LLM</h3>
+        <label>LLM Base URL <input type="text" id="set-llm-url" /></label>
+        <label>LLM API Key <input type="password" id="set-llm-key" /></label>
+        <label>Default LLM Model <input type="text" id="set-llm-model" /></label>
+        <label>Max Context Tokens (triggers Map-Reduce above this) <input type="number" id="set-llm-ctx" /></label>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="modal-settings">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-settings">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Environment Modal -->
+  <div id="modal-env" class="modal hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h2>Environment &amp; Auto-Detected Models</h2>
+        <button class="btn-icon" data-close="modal-env">✕</button>
+      </div>
+      <div class="modal-body" id="env-modal-body">Loading...</div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" data-close="modal-env">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Browser Modal -->
+  <div id="modal-browse" class="modal hidden">
+    <div class="modal-card wide">
+      <div class="modal-header">
+        <h2>Browse Local File</h2>
+        <button class="btn-icon" data-close="modal-browse">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="inline-row mb-8">
+          <input type="text" id="browse-path-bar" />
+          <button class="btn btn-secondary btn-sm" id="btn-browse-up">⬆ Up</button>
+          <button class="btn btn-secondary btn-sm" id="btn-browse-go">Go</button>
+        </div>
+        <div id="browse-list" class="browse-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

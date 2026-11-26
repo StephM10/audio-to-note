@@ -1,0 +1,18 @@
+# Editable hotwords & domain glossary (copied to config/hotwords.local.txt when customized).
+# Lines beginning with # and blank lines are ignored.
+#
+# Supported formats:
+#   Term                       -> guides both ASR and LLM
+#   wrong1, wrong2 -> Term     -> fixes recurring ASR misrecognitions in LLM polish/summary
+#   Term: short explanation    -> gives the LLM extra domain context
+
+audio-to-note
+VibeVoice
+Whisper
+Pyannote
+Ollama
+vLLM
+llama.cpp
+FFmpeg
+# Example correction rule:
+# whisper X -> WhisperX: forced alignment & diarization toolkit
